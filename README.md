@@ -1,2 +1,2 @@
 # magento-upload-auto-submit-zoneh
-SessionReaper-CVE-2025-54236
+Session Reaper CVE-2025-54236
