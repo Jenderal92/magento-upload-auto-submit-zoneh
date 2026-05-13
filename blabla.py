@@ -209,3 +209,5 @@ def main():
             if success:
                 print("  - {} -> {}".format(host, url))
 
+if __name__ == "__main__":
+    main()
