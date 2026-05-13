@@ -212,7 +212,7 @@ def main():
         print("[-] No targets found.")
         sys.exit(1)
 
-    # Hilangkan duplikat
+
     unique_hosts = {}
     for h in raw_hosts:
         norm = normalize_url(h)
