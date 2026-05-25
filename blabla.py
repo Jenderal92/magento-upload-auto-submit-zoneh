@@ -10,7 +10,7 @@ import threading
 from Queue import Queue
 from difflib import SequenceMatcher
 
-# ========== KONFIGURASI ==========
+# ========== CONFIGURASI ==========
 DEFACER_NAME = "yournick"   # <-- CHANGE WITH YOUR NICKNAME
 # =================================
 
